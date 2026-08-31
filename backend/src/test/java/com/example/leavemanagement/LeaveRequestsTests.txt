@@ -16,6 +16,9 @@ import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
+import com.example.leavemanagement.model.LeaveRequest;
+import com.example.leavemanagement.model.LeaveStatus;
+
 import java.time.LocalDate;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -72,4 +75,38 @@ class LeaveRequestsTests {
     // TODO (candidate): add a test that proves the balance bug is fixed —
     // an employee who has already used most of the quota should NOT be able
     // to create a request that pushes them over the annual quota.
+
+    @Test void create_ExceedsRemainingQuota_IsRejected() { 
+        // Arrange
+        Employee emp = new Employee();
+        emp.setName("Test Emp");
+        emp.setAnnualQuota(20);
+        employees.save(emp);
+
+        LeaveRequest approvedRequest = new LeaveRequest();
+        approvedRequest.setEmployee(emp);
+        approvedRequest.setType(LeaveType.VACATION);
+        approvedRequest.setStatus(LeaveStatus.APPROVED);
+        approvedRequest.setStartDate(LocalDate.of(2026, 3, 1));
+        approvedRequest.setEndDate(LocalDate.of(2026, 3, 15)); // 15 days 
+        approvedRequest.setDays(15);//I don't see that it calculation field
+
+        leaveRequests.save(approvedRequest);
+        
+        CreateLeaveRequestDto dto = new CreateLeaveRequestDto();
+        dto.setEmployeeId(emp.getId());
+        dto.setType(LeaveType.VACATION);
+        dto.setStartDate(LocalDate.of(2026, 4, 1));
+        dto.setEndDate(LocalDate.of(2026, 4, 6)); // 6 days: 15 + 6 > 20 
+        
+        long before = leaveRequests.count(); 
+        
+        // Act 
+        ResponseEntity<?> result = controller.create(dto); 
+        
+        // Assert 
+        assertEquals(400, result.getStatusCode().value());
+        assertEquals("Not enough vacation balance", result.getBody());
+        assertEquals(before, leaveRequests.count()); 
+        }
 }
