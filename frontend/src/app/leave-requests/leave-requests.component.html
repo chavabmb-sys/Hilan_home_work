@@ -1,0 +1,3 @@
+<!DOCTYPE html>
+<html><head><title></title></head><body><h2>Leave Requests</h2><!-- TODO (candidate): add the "new request" form here, with validation. -->
+<div>Loading...</div><table><thead><tr><th>#</th><th>Employee</th><th>Type</th><th>Start</th><th>End</th><th>Days</th><th>Status</th><th></th></tr></thead><tbody><tr><td>{{ r.id }}</td><td>{{ r.employee?.name }}</td><td>{{ typeLabel(r.type) }}</td><td>{{ r.startDate | date: 'dd/MM/yyyy' }}</td><td>{{ r.endDate | date: 'dd/MM/yyyy' }}</td><td>{{ r.days }}</td><td>{{ statusLabel(r.status) }}</td><td><button>Approve</button></td></tr></tbody></table></body></html>
