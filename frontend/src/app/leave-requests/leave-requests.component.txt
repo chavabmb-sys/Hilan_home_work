@@ -1,11 +1,140 @@
-button {
-  background: #2680c2;
-  color: #fff;
-  border: none;
-  padding: 4px 12px;
-  border-radius: 4px;
-}
+import { Component, OnInit } from '@angular/core';
+import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
+import { Observable, BehaviorSubject, finalize } from 'rxjs';
 
-button:hover {
-  background: #186faf;
+import { LeaveRequest } from './leave-request.model';
+import { LeaveRequestService } from './leave-request.service';
+
+
+// NOTE: This component was written quickly for a POC.
+// It talks to the API directly, manages state by hand and uses `any` everywhere.
+@Component({
+  selector: 'app-leave-requests',
+  standalone: true,
+  imports: [CommonModule, FormsModule],
+  templateUrl: './leave-requests.component.html',
+  styleUrls: ['./leave-requests.component.css']
+})
+export class LeaveRequestsComponent implements OnInit {
+  private requestsSubject = new BehaviorSubject<LeaveRequest[]>([]);
+  requests$: Observable<LeaveRequest[]> = this.requestsSubject.asObservable();
+
+  loading = true;
+
+  public approvingIds = new Set<number>();
+
+  public form: LeaveRequestForm = {
+    type: null,
+    startDate: '',
+    endDate: '',
+    days: null
+  };
+
+  public formError = '';
+  public approvalSuccess = '';
+  public approvalError = '';
+  
+
+  private apiUrl = 'http://localhost:5080/api/leave-requests';
+
+  constructor(private leaveRequestService: LeaveRequestService) {}
+
+  ngOnInit(): void {
+     this.leaveRequestService.getRequests().subscribe({
+        next: requests => {
+          this.requestsSubject.next(requests);
+          this.loading = false;
+        },
+        error: () => {
+          this.loading = false;
+        }
+    });
+  }
+
+  // Wired up by the candidate as part of the assignment.
+  approve(id: number): void {
+    if (this.approvingIds.has(id)) {
+      return;
+    }
+
+    this.approvalError = '';
+    this.approvalSuccess = '';
+    this.approvingIds.add(id);
+
+    this.leaveRequestService.approveRequest(id)
+      .pipe(
+        finalize(() => this.approvingIds.delete(id))
+      )
+      .subscribe({
+        next: () => {
+          const requests = this.requestsSubject.value.map(request =>
+            request.id === id
+              ? { ...request, status: 1 }
+              : request
+          );
+
+        this.requestsSubject.next(requests);
+          this.approvalSuccess = 'Leave request approved successfully.';
+        },
+        error: () => {
+          this.approvalError = 'Failed to approve the leave request. It may have already been approved.';
+        }
+      });
+  }
+
+  typeLabel(type: number): string {
+    if (type == 0) return 'Vacation';
+    if (type == 1) return 'Sick';
+    return 'Unpaid';
+  }
+
+  statusLabel(status: number): string {
+    if (status == 0) return 'Pending';
+    if (status == 1) return 'Approved';
+    return 'Rejected';
+  }
+
+  submitRequest(): void {
+    this.formError = '';
+
+    const error = this.validateForm();
+
+    if (error) {
+      this.formError = error;
+      return;
+    }
+
+    this.http.post(this.apiUrl, this.form).subscribe({
+      next: () => {
+        this.resetForm();
+        this.load();
+      },
+      error: () => {
+        this.formError = 'Failed to submit leave request. Please try again.';
+      }
+    });
+  }
+
+  
+
+  private validateForm(): string | null {
+    if (this.form.type === null) {
+      return 'Please select a leave type.';
+    }
+
+    if (!this.form.startDate || !this.form.endDate) {
+      return 'Start date and end date are required.';
+    }
+
+    if (this.form.startDate > this.form.endDate) {
+      return 'Start date cannot be later than end date.';
+    }
+
+    if (this.form.days === null || this.form.days < 0) {
+      return 'Number of days cannot be negative.';
+    }
+
+    return null;
+  }
 }

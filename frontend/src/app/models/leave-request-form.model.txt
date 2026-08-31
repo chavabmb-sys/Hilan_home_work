@@ -1,0 +1,6 @@
+interface LeaveRequestForm {
+  type: number | null;
+  startDate: string;
+  endDate: string;
+  days: number | null;
+}
